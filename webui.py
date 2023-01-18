@@ -31,7 +31,7 @@ import modules.ui
 from modules import modelloader
 from modules.shared import cmd_opts
 import modules.hypernetworks.hypernetwork
-
+from prometheus_fastapi_instrumentator import Instrumentator
 
 if cmd_opts.server_name:
     server_name = cmd_opts.server_name
@@ -160,6 +160,7 @@ def webui():
 
         app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+        Instrumentator().instrument(app).expose(app)   
         if launch_api:
             create_api(app)
 
@@ -167,7 +168,6 @@ def webui():
         modules.script_callbacks.app_started_callback(shared.demo, app)
 
         wait_on_server(shared.demo)
-
         sd_samplers.set_samplers()
 
         print('Reloading extensions')

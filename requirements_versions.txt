@@ -7,7 +7,6 @@ gradio==3.9
 numpy==1.23.3
 Pillow==9.2.0
 realesrgan==0.3.0
-torch
 omegaconf==2.2.3
 pytorch_lightning==1.7.6
 scikit-image==0.19.2
@@ -27,3 +26,5 @@ inflection==0.5.1
 GitPython==3.1.27
 torchsde==0.2.5
 safetensors==0.2.5
+httpcore==0.15
+prometheus-fastapi-instrumentator
