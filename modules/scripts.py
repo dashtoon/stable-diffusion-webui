@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import traceback
 from collections import namedtuple
@@ -36,7 +37,7 @@ class Script:
     def ui(self, is_img2img):
         """this function should create gradio UI elements. See https://gradio.app/docs/#components
         The return value should be an array of all components that are used in processing.
-        Values of those returned componenbts will be passed to run() and process() functions.
+        Values of those returned components will be passed to run() and process() functions.
         """
 
         pass
@@ -47,7 +48,7 @@ class Script:
 
         This function should return:
          - False if the script should not be shown in UI at all
-         - True if the script should be shown in UI if it's scelected in the scripts drowpdown
+         - True if the script should be shown in UI if it's selected in the scripts dropdown
          - script.AlwaysVisible if the script should be shown in UI at all times
          """
 
@@ -88,6 +89,17 @@ class Script:
 
         pass
 
+    def postprocess_batch(self, p, *args, **kwargs):
+        """
+        Same as process_batch(), but called for every batch after it has been generated.
+
+        **kwargs will have same items as process_batch, and also:
+          - batch_number - index of current batch, from 0 to number of batches-1
+          - images - torch tensor with all generated images, with values ranging from 0 to 1;
+        """
+
+        pass
+
     def postprocess(self, p, processed, *args):
         """
         This function is called after processing ends for AlwaysVisible scripts.
@@ -117,6 +129,15 @@ class Script:
         """unused"""
         return ""
 
+    def elem_id(self, item_id):
+        """helper function to generate id for a HTML element, constructs final id out of script name, tab and user-supplied item_id"""
+
+        need_tabname = self.show(True) == self.show(False)
+        tabname = ('img2img' if self.is_img2img else 'txt2txt') + "_" if need_tabname else ""
+        title = re.sub(r'[^a-z_0-9]', '', re.sub(r'\s', '_', self.title().lower()))
+
+        return f'script_{tabname}{title}_{item_id}'
+
 
 current_basedir = paths.script_path
 
@@ -131,7 +152,7 @@ def basedir():
 
 scripts_data = []
 ScriptFile = namedtuple("ScriptFile", ["basedir", "filename", "path"])
-ScriptClassData = namedtuple("ScriptClassData", ["script_class", "path", "basedir"])
+ScriptClassData = namedtuple("ScriptClassData", ["script_class", "path", "basedir", "module"])
 
 
 def list_scripts(scriptdirname, extension):
@@ -185,7 +206,7 @@ def load_scripts():
 
             for key, script_class in module.__dict__.items():
                 if type(script_class) == type and issubclass(script_class, Script):
-                    scripts_data.append(ScriptClassData(script_class, scriptfile.path, scriptfile.basedir))
+                    scripts_data.append(ScriptClassData(script_class, scriptfile.path, scriptfile.basedir, module))
 
         except Exception:
             print(f"Error loading script: {scriptfile.filename}", file=sys.stderr)
@@ -220,7 +241,7 @@ class ScriptRunner:
         self.alwayson_scripts.clear()
         self.selectable_scripts.clear()
 
-        for script_class, path, basedir in scripts_data:
+        for script_class, path, basedir, script_module in scripts_data:
             script = script_class()
             script.filename = path
             script.is_txt2img = not is_img2img
@@ -269,7 +290,6 @@ class ScriptRunner:
             script.group = group
 
         dropdown = gr.Dropdown(label="Script", elem_id="script_list", choices=["None"] + self.titles, value="None", type="index")
-        dropdown.save_to_config = True
         inputs[0] = dropdown
 
         for script in self.selectable_scripts:
@@ -345,6 +365,15 @@ class ScriptRunner:
                 script.postprocess(p, processed, *script_args)
             except Exception:
                 print(f"Error running postprocess: {script.filename}", file=sys.stderr)
+                print(traceback.format_exc(), file=sys.stderr)
+
+    def postprocess_batch(self, p, images, **kwargs):
+        for script in self.alwayson_scripts:
+            try:
+                script_args = p.script_args[script.args_from:script.args_to]
+                script.postprocess_batch(p, *script_args, images=images, **kwargs)
+            except Exception:
+                print(f"Error running postprocess_batch: {script.filename}", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
 
     def before_component(self, component, **kwargs):

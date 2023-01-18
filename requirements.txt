@@ -1,16 +1,16 @@
+blendmodes
 accelerate
 basicsr
-diffusers
 fairscale==0.4.4
 fonts
 font-roboto
 gfpgan
-gradio==3.9
 httpcore==0.15
+gradio==3.16.2
 invisible-watermark
 numpy
 omegaconf
-opencv-python
+opencv-contrib-python
 requests
 piexif
 Pillow
@@ -30,3 +30,4 @@ inflection
 GitPython
 torchsde
 safetensors
+psutil

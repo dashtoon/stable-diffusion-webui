@@ -1,9 +1,11 @@
-function gradioApp(){
-    return document.getElementsByTagName('gradio-app')[0].shadowRoot;
+function gradioApp() {
+    const elems = document.getElementsByTagName('gradio-app')
+    const gradioShadowRoot = elems.length == 0 ? null : elems[0].shadowRoot
+    return !!gradioShadowRoot ? gradioShadowRoot : document;
 }
 
 function get_uiCurrentTab() {
-    return gradioApp().querySelector('.tabs button:not(.border-transparent)')
+    return gradioApp().querySelector('#tabs button:not(.border-transparent)')
 }
 
 function get_uiCurrentTabContent() {
@@ -12,6 +14,7 @@ function get_uiCurrentTabContent() {
 
 uiUpdateCallbacks = []
 uiTabChangeCallbacks = []
+optionsChangedCallbacks = []
 let uiCurrentTab = null
 
 function onUiUpdate(callback){
@@ -19,6 +22,9 @@ function onUiUpdate(callback){
 }
 function onUiTabChange(callback){
     uiTabChangeCallbacks.push(callback)
+}
+function onOptionsChanged(callback){
+    optionsChangedCallbacks.push(callback)
 }
 
 function runCallback(x, m){

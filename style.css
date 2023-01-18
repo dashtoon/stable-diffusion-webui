@@ -20,7 +20,7 @@
     padding-right: 0.25em;
     margin: 0.1em 0;
     opacity: 0%;
-    cursor: default;	
+    cursor: default;
 }
 
 .output-html p {margin: 0 0.5em;}
@@ -73,8 +73,9 @@
     margin-right: auto;
 }
 
-#random_seed, #random_subseed, #reuse_seed, #reuse_subseed, #open_folder{
-    min-width: auto;
+[id$=_random_seed], [id$=_random_subseed], [id$=_reuse_seed], [id$=_reuse_subseed], #open_folder{
+    min-width: 2.3em;
+    height: 2.5em;
     flex-grow: 0;
     padding-left: 0.25em;
     padding-right: 0.25em;
@@ -84,27 +85,28 @@
     display: none;
 }
 
-#seed_row, #subseed_row{
+[id$=_seed_row], [id$=_subseed_row]{
     gap: 0.5rem;
+    padding: 0.6em;
 }
 
-#subseed_show_box{
+[id$=_subseed_show_box]{
     min-width: auto;
     flex-grow: 0;
 }
 
-#subseed_show_box > div{
+[id$=_subseed_show_box] > div{
     border: 0;
     height: 100%;
 }
 
-#subseed_show{
+[id$=_subseed_show]{
     min-width: auto;
     flex-grow: 0;
     padding: 0;
 }
 
-#subseed_show label{
+[id$=_subseed_show] label{
     height: 100%;
 }
 
@@ -112,9 +114,10 @@
     min-width: unset !important;
     flex-grow: 0 !important;
     padding: 0.4em 0;
+    gap: 0;
 }
 
-#roll, #paste, #style_create, #style_apply{
+#roll_col > button {
     min-width: 2em;
     min-height: 2em;
     max-width: 2em;
@@ -139,8 +142,12 @@
     min-width: 8em !important;
 }
 
-#txt2img_style_index, #txt2img_style2_index, #img2img_style_index, #img2img_style2_index{
+#txt2img_styles, #img2img_styles{
     margin-top: 1em;
+}
+
+#txt2img_styles ul, #img2img_styles ul{
+    max-height: 35em;
 }
 
 .gr-form{
@@ -152,10 +159,14 @@
     margin-bottom: 0;
 }
 
-#toprow div{
+#toprow div.gr-box, #toprow div.gr-form{
     border: none;
     gap: 0;
     background: transparent;
+    box-shadow: none;
+}
+#toprow div{
+    gap: 0;
 }
 
 #resize_mode{
@@ -206,24 +217,27 @@ button{
 
 fieldset span.text-gray-500, .gr-block.gr-box span.text-gray-500,  label.block span{
     position: absolute;
-    top: -0.6em;
+    top: -0.7em;
     line-height: 1.2em;
-    padding: 0 0.5em;
-    margin: 0;
+    padding: 0;
+    margin: 0 0.5em;
 
     background-color: white;
-    border-top: 1px solid #eee;
-    border-left: 1px solid #eee;
-    border-right: 1px solid #eee;
+    box-shadow:  6px 0 6px 0px white, -6px 0 6px 0px white;
 
     z-index: 300;
 }
 
 .dark fieldset span.text-gray-500, .dark .gr-block.gr-box span.text-gray-500, .dark label.block span{
     background-color: rgb(31, 41, 55);
-    border-top: 1px solid rgb(55 65 81);
-    border-left: 1px solid rgb(55 65 81);
-    border-right: 1px solid rgb(55 65 81);
+    box-shadow: none;
+    border: 1px solid rgba(128, 128, 128, 0.1);
+    border-radius: 6px;
+    padding: 0.1em 0.5em;
+}
+
+#txt2img_column_batch, #img2img_column_batch{
+    min-width: min(13.5em, 100%) !important;
 }
 
 #settings fieldset span.text-gray-500, #settings .gr-block.gr-box span.text-gray-500, #settings label.block span{
@@ -232,22 +246,40 @@ fieldset span.text-gray-500, .gr-block.gr-box span.text-gray-500,  label.block s
     margin-right: 8em;
 }
 
-.gr-panel div.flex-col div.justify-between label span{
-    margin: 0;
-}
-
 #settings .gr-panel div.flex-col div.justify-between div{
     position: relative;
     z-index: 200;
 }
 
-input[type="range"]{
-    margin: 0.5em 0 -0.3em 0;
+#settings{
+    display: block;
 }
 
-#txt2img_sampling label{
-    padding-left: 0.6em;
-    padding-right: 0.6em;
+#settings > div{
+    border: none;
+    margin-left: 10em;
+}
+
+#settings > div.flex-wrap{
+    float: left;
+    display: block;
+    margin-left: 0;
+    width: 10em;
+}
+
+#settings > div.flex-wrap button{
+    display: block;
+    border: none;
+    text-align: left;
+}
+
+#settings_result{
+    height: 1.4em;
+    margin: 0 1.2em;
+}
+
+input[type="range"]{
+    margin: 0.5em 0 -0.3em 0;
 }
 
 #mask_bug_info {
@@ -270,41 +302,49 @@ input[type="range"]{
   min-height: unset !important;
 }
 
-#txt2img_progressbar, #img2img_progressbar, #ti_progressbar{
-  position: absolute;
-  z-index: 1000;
-  right: 0;
-  padding-left: 5px;
-  padding-right: 5px;
-  display: block;
-}
-
-#txt2img_progress_row, #img2img_progress_row{
-  margin-bottom: 10px;
-  margin-top: -18px;
-}
-
 .progressDiv{
-  width: 100%;
-  height: 20px;
-  background: #b4c0cc;
-  border-radius: 8px;
+    position: absolute;
+    height: 20px;
+    top: -20px;
+    background: #b4c0cc;
+    border-radius: 3px !important;
 }
 
 .dark .progressDiv{
-  background: #424c5b;
+    background: #424c5b;
 }
 
 .progressDiv .progress{
-  width: 0%;
-  height: 20px;
-  background: #0060df;
-  color: white;
-  font-weight: bold;
-  line-height: 20px;
-  padding: 0 8px 0 0;
-  text-align: right;
-  border-radius: 8px;
+    width: 0%;
+    height: 20px;
+    background: #0060df;
+    color: white;
+    font-weight: bold;
+    line-height: 20px;
+    padding: 0 8px 0 0;
+    text-align: right;
+    border-radius: 3px;
+    overflow: visible;
+    white-space: nowrap;
+    padding: 0 0.5em;
+}
+
+.livePreview{
+    position: absolute;
+    z-index: 300;
+    background-color: white;
+    margin: -4px;
+}
+
+.dark .livePreview{
+    background-color: rgb(17 24 39 / var(--tw-bg-opacity));
+}
+
+.livePreview img{
+    position: absolute;
+    object-fit: contain;
+    width: 100%;
+    height: 100%;
 }
 
 #lightboxModal{
@@ -351,7 +391,7 @@ input[type="range"]{
     grid-area: tile;
 }
 
-.modalClose, 
+.modalClose,
 .modalZoom,
 .modalTileImage {
   color: white;
@@ -430,23 +470,25 @@ input[type="range"]{
     display:none
 }
 
-#txt2img_interrupt, #img2img_interrupt{
-  position: absolute;
-  width: 50%;
-  height: 72px;
-  background: #b4c0cc;
-  border-radius: 0px;
-  display: none;
+#txt2img_generate_box, #img2img_generate_box{
+    position: relative;
 }
 
+#txt2img_interrupt, #img2img_interrupt, #txt2img_skip, #img2img_skip{
+    position: absolute;
+    width: 50%;
+    height: 100%;
+    background: #b4c0cc;
+    display: none;
+}
+
+#txt2img_interrupt, #img2img_interrupt{
+    left: 0;
+    border-radius: 0.5rem 0 0 0.5rem;
+}
 #txt2img_skip, #img2img_skip{
-  position: absolute;
-  width: 50%;
-  right: 0px;
-  height: 72px;
-  background: #b4c0cc;
-  border-radius: 0px;
-  display: none;
+    right: 0;
+    border-radius: 0 0.5rem 0.5rem 0;
 }
 
 .red {
@@ -488,25 +530,20 @@ input[type="range"]{
     gap: 0.4em;
 }
 
-#quicksettings > div{
-    border: none;
-    background: none;
-    flex: unset;
-    gap: 0.5em;
-}
-
-#quicksettings > div > div{
-    max-width: 32em;
+#quicksettings > div, #quicksettings > fieldset{
+    max-width: 24em;
     min-width: 24em;
     padding: 0;
+    border: none;
+    box-shadow: none;
+    background: none;
 }
 
-#refresh_sd_model_checkpoint, #refresh_sd_vae, #refresh_sd_hypernetwork, #refresh_train_hypernetwork_name, #refresh_train_embedding_name, #refresh_localization{
-    max-width: 2.5em;
-    min-width: 2.5em;
-    height: 2.4em;
+#quicksettings > div > div > div > label > span {
+    position: relative;
+    margin-right: 9em;
+    margin-bottom: -1em;
 }
-
 
 canvas[key="mask"] {
     z-index: 12 !important;
@@ -521,7 +558,7 @@ canvas[key="mask"] {
     position: absolute;
     right: 0.5em;
     top: -0.6em;
-    z-index: 200;
+    z-index: 400;
     width: 8em;
 }
 #quicksettings .gr-box > div > div > input.gr-text-input {
@@ -533,7 +570,9 @@ canvas[key="mask"] {
 }
 
 #img2img_image, #img2img_image > .h-60, #img2img_image > .h-60 > div, #img2img_image > .h-60 > div > img,
-img2maskimg, #img2maskimg > .h-60, #img2maskimg > .h-60 > div, #img2maskimg > .h-60 > div > img
+#img2img_sketch, #img2img_sketch > .h-60, #img2img_sketch > .h-60 > div, #img2img_sketch > .h-60 > div > img,
+#img2maskimg, #img2maskimg > .h-60, #img2maskimg > .h-60 > div, #img2maskimg > .h-60 > div > img,
+#inpaint_sketch, #inpaint_sketch > .h-60, #inpaint_sketch > .h-60 > div, #inpaint_sketch > .h-60 > div > img
 {
     height: 480px !important;
     max-height: 480px !important;
@@ -542,7 +581,7 @@ img2maskimg, #img2maskimg > .h-60, #img2maskimg > .h-60 > div, #img2maskimg > .h
 
 /* Extensions */
 
-#tab_extensions table{
+#tab_extensions table``{
     border-collapse: collapse;
 }
 
@@ -566,6 +605,136 @@ img2maskimg, #img2maskimg > .h-60, #img2maskimg > .h-60 > div, #img2maskimg > .h
 .extension-tag{
     font-weight: bold;
     font-size: 95%;
+}
+
+#available_extensions .info{
+    margin: 0;
+}
+
+#available_extensions .date_added{
+    opacity: 0.85;
+    font-size: 90%;
+}
+
+#image_buttons_txt2img button, #image_buttons_img2img button, #image_buttons_extras button{
+    min-width: auto;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+}
+
+.gr-form{
+    background-color: white;
+}
+
+.dark .gr-form{
+    background-color: rgb(31 41 55 / var(--tw-bg-opacity));
+}
+
+.gr-button-tool{
+    max-width: 2.5em;
+    min-width: 2.5em !important;
+    height: 2.4em;
+    margin: 1.6em 0.7em 0.55em 0;
+}
+
+#tab_modelmerger .gr-button-tool{
+    margin: 0.6em 0em 0.55em 0;
+}
+
+#quicksettings .gr-button-tool{
+    margin: 0;
+}
+
+
+#img2img_settings > div.gr-form, #txt2img_settings > div.gr-form {
+    padding-top: 0.9em;
+}
+
+#img2img_settings div.gr-form .gr-form, #txt2img_settings div.gr-form .gr-form, #train_tabs div.gr-form .gr-form{
+    border: none;
+    padding-bottom: 0.5em;
+}
+
+footer {
+    display: none !important;
+}
+
+#footer{
+    text-align: center;
+}
+
+#footer div{
+    display: inline-block;
+}
+
+#footer .versions{
+    font-size: 85%;
+    opacity: 0.85;
+}
+
+#txtimg_hr_finalres{
+    min-height: 0 !important;
+    padding: .625rem .75rem;
+    margin-left: -0.75em
+
+}
+
+#txtimg_hr_finalres .resolution{
+    font-weight: bold;
+}
+
+#txt2img_checkboxes, #img2img_checkboxes{
+    margin-bottom: 0.5em;
+}
+#txt2img_checkboxes > div > div, #img2img_checkboxes > div > div{
+    flex: 0;
+    white-space: nowrap;
+    min-width: auto;
+}
+
+.inactive{
+    opacity: 0.5;
+}
+
+.gr-compact {
+    border: none;
+}
+
+.dark .gr-compact{
+    background-color: rgb(31 41 55 / var(--tw-bg-opacity));
+    margin-left: 0.8em;
+}
+
+.gr-compact > *{
+    margin-top: 0.5em !important;
+}
+
+.gr-compact .gr-block, .gr-compact .gr-form{
+    border: none;
+    box-shadow: none;
+}
+
+.gr-compact .gr-box{
+    border-radius: .5rem !important;
+    border-width: 1px !important;
+}
+
+#mode_img2img > div > div{
+    gap: 0 !important;
+}
+
+[id*='img2img_copy_to_'] {
+    border: none;
+}
+
+[id*='img2img_copy_to_'] > button {
+}
+
+[id*='img2img_label_copy_to_'] {
+    font-size: 1.0em;
+    font-weight: bold;
+    text-align: center;
+    line-height: 2.4em;
 }
 
 /* The following handles localization for right-to-left (RTL) languages like Arabic.

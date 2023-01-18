@@ -1,8 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #################################################
 # Please do not make any changes to this file,  #
 # change the variables in webui-user.sh instead #
 #################################################
+
+# If run from macOS, load defaults from webui-macos-env.sh
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [[ -f webui-macos-env.sh ]]
+        then
+        source ./webui-macos-env.sh
+    fi
+fi
 
 # Read variables from webui-user.sh
 # shellcheck source=/dev/null
@@ -51,10 +59,11 @@ fi
 can_run_as_root=1
 
 # read any command line flags to the webui.sh script
-while getopts "f" flag
+while getopts "f" flag > /dev/null 2>&1
 do
     case ${flag} in
         f) can_run_as_root=1;;
+        *) break;;
     esac
 done
 
@@ -151,10 +160,20 @@ then
     printf "\n%s\n" "${delimiter}"
     printf "Accelerating launch.py..."
     printf "\n%s\n" "${delimiter}"
-    accelerate launch --num_cpu_threads_per_process=6 "${LAUNCH_SCRIPT}" "$@"
+    exec accelerate launch --num_cpu_threads_per_process=6 "${LAUNCH_SCRIPT}" "$@"
 else
     printf "\n%s\n" "${delimiter}"
     printf "Launching launch.py..."
     printf "\n%s\n" "${delimiter}"
-    "${python_cmd}" "${LAUNCH_SCRIPT}" "$@"
+    gpu_info=$(lspci | grep VGA)
+    if echo "$gpu_info" | grep -q "AMD"
+    then
+        if [[ -z "${TORCH_COMMAND}" ]]
+        then	    
+            export TORCH_COMMAND="pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/rocm5.2"
+        fi
+        HSA_OVERRIDE_GFX_VERSION=10.3.0 exec "${python_cmd}" "${LAUNCH_SCRIPT}" "$@"
+    else
+        exec "${python_cmd}" "${LAUNCH_SCRIPT}" "$@"
+    fi
 fi
