@@ -9,7 +9,6 @@ from PIL import Image
 import gradio as gr
 import tqdm
 
-import modules.artists
 import modules.interrogate
 import modules.memmon
 import modules.styles
@@ -20,12 +19,15 @@ from modules.paths import models_path, script_path, sd_path
 
 demo = None
 
+sd_default_config = os.path.join(script_path, "configs/v1-inference.yaml")
 sd_model_file = os.path.join(script_path, 'model.ckpt')
 default_sd_model_file = sd_model_file
+
 parser = argparse.ArgumentParser()
-parser.add_argument("--config", type=str, default=os.path.join(script_path, "configs/v1-inference.yaml"), help="path to config which constructs model",)
+parser.add_argument("--config", type=str, default=sd_default_config, help="path to config which constructs model",)
 parser.add_argument("--ckpt", type=str, default=sd_model_file, help="path to checkpoint of stable diffusion model; if specified, this checkpoint will be added to the list of checkpoints and loaded",)
 parser.add_argument("--ckpt-dir", type=str, default=None, help="Path to directory with stable diffusion checkpoints")
+parser.add_argument("--vae-dir", type=str, default=None, help="Path to directory with VAE files")
 parser.add_argument("--gfpgan-dir", type=str, help="GFPGAN directory", default=('./src/gfpgan' if os.path.exists('./src/gfpgan') else './GFPGAN'))
 parser.add_argument("--gfpgan-model", type=str, help="GFPGAN model file name", default=None)
 parser.add_argument("--no-half", action='store_true', help="do not switch the model to 16-bit floats")
@@ -55,6 +57,7 @@ parser.add_argument("--realesrgan-models-path", type=str, help="Path to director
 parser.add_argument("--clip-models-path", type=str, help="Path to directory with CLIP model file(s).", default=None)
 parser.add_argument("--xformers", action='store_true', help="enable xformers for cross attention layers")
 parser.add_argument("--force-enable-xformers", action='store_true', help="enable xformers for cross attention layers regardless of whether the checking code thinks you can run it; do not make bug reports if this fails to work")
+parser.add_argument("--xformers-flash-attention", action='store_true', help="enable xformers with Flash Attention to improve reproducibility (supported for SD2.x or variant only)")
 parser.add_argument("--deepdanbooru", action='store_true', help="does not do anything")
 parser.add_argument("--opt-split-attention", action='store_true', help="force-enables Doggettx's cross-attention layer optimization. By default, it's on for torch cuda.")
 parser.add_argument("--opt-sub-quad-attention", action='store_true', help="enable memory efficient sub-quadratic cross-attention layer optimization")
@@ -98,6 +101,8 @@ parser.add_argument("--cors-allow-origins-regex", type=str, help="Allowed CORS o
 parser.add_argument("--tls-keyfile", type=str, help="Partially enables TLS, requires --tls-certfile to fully function", default=None)
 parser.add_argument("--tls-certfile", type=str, help="Partially enables TLS, requires --tls-keyfile to fully function", default=None)
 parser.add_argument("--server-name", type=str, help="Sets hostname of server", default=None)
+parser.add_argument("--gradio-queue", action='store_true', help="Uses gradio queue; experimental option; breaks restart UI button")
+
 
 script_loading.preload_extensions(extensions.extensions_dir, parser)
 script_loading.preload_extensions(extensions.extensions_builtin_dir, parser)
@@ -143,7 +148,7 @@ config_filename = cmd_opts.ui_settings_file
 
 os.makedirs(cmd_opts.hypernetwork_dir, exist_ok=True)
 hypernetworks = {}
-loaded_hypernetwork = None
+loaded_hypernetworks = []
 
 
 def reload_hypernetworks():
@@ -151,8 +156,6 @@ def reload_hypernetworks():
     global hypernetworks
 
     hypernetworks = hypernetwork.list_hypernetworks(cmd_opts.hypernetwork_dir)
-    hypernetwork.load_hypernetwork(opts.sd_hypernetwork)
-
 
 
 class State:
@@ -252,8 +255,6 @@ class State:
 
 state = State()
 state.server_start = time.time()
-
-artist_db = modules.artists.ArtistsDatabase(os.path.join(script_path, 'artists.csv'))
 
 styles_filename = cmd_opts.styles_file
 prompt_styles = modules.styles.StyleDatabase(styles_filename)
@@ -369,6 +370,7 @@ options_templates.update(options_section(('face-restoration', "Face restoration"
 }))
 
 options_templates.update(options_section(('system', "System"), {
+    "show_warnings": OptionInfo(False, "Show warnings in console."),
     "memmon_poll_rate": OptionInfo(8, "VRAM usage polls per second during generation. Set to 0 to disable.", gr.Slider, {"minimum": 0, "maximum": 40, "step": 1}),
     "samples_log_stdout": OptionInfo(False, "Always print all generation info to standard output"),
     "multiple_tqdm": OptionInfo(True, "Add a second progress bar to the console that shows progress for an entire job."),
@@ -396,10 +398,8 @@ options_templates.update(options_section(('sd', "Stable Diffusion"), {
     "sd_vae_checkpoint_cache": OptionInfo(0, "VAE Checkpoints to cache in RAM", gr.Slider, {"minimum": 0, "maximum": 10, "step": 1}),
     "sd_vae": OptionInfo("Automatic", "SD VAE", gr.Dropdown, lambda: {"choices": ["Automatic", "None"] + list(sd_vae.vae_dict)}, refresh=sd_vae.refresh_vae_list),
     "sd_vae_as_default": OptionInfo(True, "Ignore selected VAE for stable diffusion checkpoints that have their own .vae.pt next to them"),
-    "sd_hypernetwork": OptionInfo("None", "Hypernetwork", gr.Dropdown, lambda: {"choices": ["None"] + [x for x in hypernetworks.keys()]}, refresh=reload_hypernetworks),
-    "sd_hypernetwork_strength": OptionInfo(1.0, "Hypernetwork strength", gr.Slider, {"minimum": 0.0, "maximum": 1.0, "step": 0.001}),
     "inpainting_mask_weight": OptionInfo(1.0, "Inpainting conditioning mask strength", gr.Slider, {"minimum": 0.0, "maximum": 1.0, "step": 0.01}),
-    "initial_noise_multiplier": OptionInfo(1.0, "Noise multiplier for img2img", gr.Slider, {"minimum": 0.5, "maximum": 1.5, "step": 0.01 }),
+    "initial_noise_multiplier": OptionInfo(1.0, "Noise multiplier for img2img", gr.Slider, {"minimum": 0.5, "maximum": 1.5, "step": 0.01}),
     "img2img_color_correction": OptionInfo(False, "Apply color correction to img2img results to match original colors."),
     "img2img_fix_steps": OptionInfo(False, "With img2img, do exactly the amount of steps the slider specifies (normally you'd do less with less denoising)."),
     "img2img_background_color": OptionInfo("#ffffff", "With img2img, fill image's transparent parts with this color.", ui_components.FormColorPicker, {}),
@@ -407,8 +407,8 @@ options_templates.update(options_section(('sd', "Stable Diffusion"), {
     "enable_emphasis": OptionInfo(True, "Emphasis: use (text) to make model pay more attention to text and [text] to make it pay less attention"),
     "enable_batch_seeds": OptionInfo(True, "Make K-diffusion samplers produce same images in a batch as when making a single image"),
     "comma_padding_backtrack": OptionInfo(20, "Increase coherency by padding from the last comma within n tokens when using more than 75 tokens", gr.Slider, {"minimum": 0, "maximum": 74, "step": 1 }),
-    'CLIP_stop_at_last_layers': OptionInfo(1, "Clip skip", gr.Slider, {"minimum": 1, "maximum": 12, "step": 1}),
-    "random_artist_categories": OptionInfo([], "Allowed categories for random artists selection when using the Roll button", gr.CheckboxGroup, {"choices": artist_db.categories()}),
+    "CLIP_stop_at_last_layers": OptionInfo(1, "Clip skip", gr.Slider, {"minimum": 1, "maximum": 12, "step": 1}),
+    "extra_networks_default_multiplier": OptionInfo(1.0, "Multiplier for extra networks", gr.Slider, {"minimum": 0.0, "maximum": 1.0, "step": 0.01}),
 }))
 
 options_templates.update(options_section(('compatibility', "Compatibility"), {
@@ -419,17 +419,21 @@ options_templates.update(options_section(('compatibility', "Compatibility"), {
 
 options_templates.update(options_section(('interrogate', "Interrogate Options"), {
     "interrogate_keep_models_in_memory": OptionInfo(False, "Interrogate: keep models in VRAM"),
-    "interrogate_use_builtin_artists": OptionInfo(True, "Interrogate: use artists from artists.csv"),
     "interrogate_return_ranks": OptionInfo(False, "Interrogate: include ranks of model tags matches in results (Has no effect on caption-based interrogators)."),
     "interrogate_clip_num_beams": OptionInfo(1, "Interrogate: num_beams for BLIP", gr.Slider, {"minimum": 1, "maximum": 16, "step": 1}),
     "interrogate_clip_min_length": OptionInfo(24, "Interrogate: minimum description length (excluding artists, etc..)", gr.Slider, {"minimum": 1, "maximum": 128, "step": 1}),
     "interrogate_clip_max_length": OptionInfo(48, "Interrogate: maximum description length", gr.Slider, {"minimum": 1, "maximum": 256, "step": 1}),
     "interrogate_clip_dict_limit": OptionInfo(1500, "CLIP: maximum number of lines in text file (0 = No limit)"),
+    "interrogate_clip_skip_categories": OptionInfo([], "CLIP: skip inquire categories", gr.CheckboxGroup, lambda: {"choices": modules.interrogate.category_types()}, refresh=modules.interrogate.category_types),
     "interrogate_deepbooru_score_threshold": OptionInfo(0.5, "Interrogate: deepbooru score threshold", gr.Slider, {"minimum": 0, "maximum": 1, "step": 0.01}),
     "deepbooru_sort_alpha": OptionInfo(True, "Interrogate: deepbooru sort alphabetically"),
     "deepbooru_use_spaces": OptionInfo(False, "use spaces for tags in deepbooru"),
     "deepbooru_escape": OptionInfo(True, "escape (\\) brackets in deepbooru (so they are used as literal brackets and not for emphasis)"),
     "deepbooru_filter_tags": OptionInfo("", "filter out those tags from deepbooru output (separated by comma)"),
+}))
+
+options_templates.update(options_section(('extra_networks', "Extra Networks"), {
+    "extra_networks_default_view": OptionInfo("cards", "Default view for Extra Networks", gr.Dropdown, { "choices": ["cards", "thumbs"] }),
 }))
 
 options_templates.update(options_section(('ui', "User interface"), {
@@ -445,10 +449,13 @@ options_templates.update(options_section(('ui', "User interface"), {
     "js_modal_lightbox_initially_zoomed": OptionInfo(True, "Show images zoomed in by default in full page image viewer"),
     "show_progress_in_title": OptionInfo(True, "Show generation progress in window title."),
     "samplers_in_dropdown": OptionInfo(True, "Use dropdown for sampler selection instead of radio group"),
-    "dimensions_and_batch_together": OptionInfo(True, "Show Witdth/Height and Batch sliders in same row"),
-    'quicksettings': OptionInfo("sd_model_checkpoint", "Quicksettings list"),
-    'ui_reorder': OptionInfo(", ".join(ui_reorder_categories), "txt2img/img2img UI item order"),
-    'localization': OptionInfo("None", "Localization (requires restart)", gr.Dropdown, lambda: {"choices": ["None"] + list(localization.localizations.keys())}, refresh=lambda: localization.list_localizations(cmd_opts.localizations_dir)),
+    "dimensions_and_batch_together": OptionInfo(True, "Show Width/Height and Batch sliders in same row"),
+    "keyedit_precision_attention": OptionInfo(0.1, "Ctrl+up/down precision when editing (attention:1.1)", gr.Slider, {"minimum": 0.01, "maximum": 0.2, "step": 0.001}),
+    "keyedit_precision_extra": OptionInfo(0.05, "Ctrl+up/down precision when editing <extra networks:0.9>", gr.Slider, {"minimum": 0.01, "maximum": 0.2, "step": 0.001}),
+    "quicksettings": OptionInfo("sd_model_checkpoint", "Quicksettings list"),
+    "ui_reorder": OptionInfo(", ".join(ui_reorder_categories), "txt2img/img2img UI item order"),
+    "ui_extra_networks_tab_reorder": OptionInfo("", "Extra networks tab order"),
+    "localization": OptionInfo("None", "Localization (requires restart)", gr.Dropdown, lambda: {"choices": ["None"] + list(localization.localizations.keys())}, refresh=lambda: localization.list_localizations(cmd_opts.localizations_dir)),
 }))
 
 options_templates.update(options_section(('ui', "Live previews"), {
@@ -471,6 +478,11 @@ options_templates.update(options_section(('sampler-params', "Sampler parameters"
     's_noise': OptionInfo(1.0, "sigma noise", gr.Slider, {"minimum": 0.0, "maximum": 1.0, "step": 0.01}),
     'eta_noise_seed_delta': OptionInfo(0, "Eta noise seed delta", gr.Number, {"precision": 0}),
     'always_discard_next_to_last_sigma': OptionInfo(False, "Always discard next-to-last sigma"),
+}))
+
+options_templates.update(options_section(('postprocessing', "Postprocessing"), {
+    'postprocessing_scipts_order': OptionInfo("upscale, gfpgan, codeformer", "Postprocessing operation order"),
+    'upscaling_max_images_in_cache': OptionInfo(5, "Maximum number of images in upscaling cache", gr.Slider, {"minimum": 0, "maximum": 10, "step": 1}),
 }))
 
 options_templates.update(options_section((None, "Hidden options"), {
@@ -658,3 +670,17 @@ mem_mon.start()
 def listfiles(dirname):
     filenames = [os.path.join(dirname, x) for x in sorted(os.listdir(dirname)) if not x.startswith(".")]
     return [file for file in filenames if os.path.isfile(file)]
+
+
+def html_path(filename):
+    return os.path.join(script_path, "html", filename)
+
+
+def html(filename):
+    path = html_path(filename)
+
+    if os.path.exists(path):
+        with open(path, encoding="utf8") as file:
+            return file.read()
+
+    return ""
