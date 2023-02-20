@@ -59,13 +59,17 @@ class CheckpointInfo:
 
     def calculate_shorthash(self):
         self.sha256 = hashes.sha256(self.filename, "checkpoint/" + self.name)
+        if self.sha256 is None:
+            return
+
         self.shorthash = self.sha256[0:10]
 
         if self.shorthash not in self.ids:
-            self.ids += [self.shorthash, self.sha256]
-            self.register()
+            self.ids += [self.shorthash, self.sha256, f'{self.name} [{self.shorthash}]']
 
+        checkpoints_list.pop(self.title)
         self.title = f'{self.name} [{self.shorthash}]'
+        self.register()
 
         return self.shorthash
 
@@ -101,9 +105,15 @@ def checkpoint_tiles():
 def list_models():
     checkpoints_list.clear()
     checkpoint_alisases.clear()
-    model_list = modelloader.load_models(model_path=model_path, command_path=shared.cmd_opts.ckpt_dir, ext_filter=[".ckpt", ".safetensors"], ext_blacklist=[".vae.safetensors"])
 
     cmd_ckpt = shared.cmd_opts.ckpt
+    if shared.cmd_opts.no_download_sd_model or cmd_ckpt != shared.sd_model_file or os.path.exists(cmd_ckpt):
+        model_url = None
+    else:
+        model_url = "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors"
+
+    model_list = modelloader.load_models(model_path=model_path, model_url=model_url, command_path=shared.cmd_opts.ckpt_dir, ext_filter=[".ckpt", ".safetensors"], download_name="v1-5-pruned-emaonly.safetensors", ext_blacklist=[".vae.ckpt", ".vae.safetensors"])
+
     if os.path.exists(cmd_ckpt):
         checkpoint_info = CheckpointInfo(cmd_ckpt)
         checkpoint_info.register()
@@ -158,7 +168,7 @@ def select_checkpoint():
         print(f" - directory {model_path}", file=sys.stderr)
         if shared.cmd_opts.ckpt_dir is not None:
             print(f" - directory {os.path.abspath(shared.cmd_opts.ckpt_dir)}", file=sys.stderr)
-        print("Can't run without a checkpoint. Find and place a .ckpt file into any of those locations. The program will exit.", file=sys.stderr)
+        print("Can't run without a checkpoint. Find and place a .ckpt or .safetensors file into any of those locations. The program will exit.", file=sys.stderr)
         exit(1)
 
     checkpoint_info = next(iter(checkpoints_list.values()))
@@ -350,6 +360,9 @@ def repair_config(sd_config):
         sd_config.model.params.unet_config.params.use_fp16 = True
 
 
+sd1_clip_weight = 'cond_stage_model.transformer.text_model.embeddings.token_embedding.weight'
+sd2_clip_weight = 'cond_stage_model.model.transformer.resblocks.0.attn.in_proj_weight'
+
 def load_model(checkpoint_info=None, already_loaded_state_dict=None, time_taken_to_load_state_dict=None):
     from modules import lowvram, sd_hijack
     checkpoint_info = checkpoint_info or select_checkpoint()
@@ -370,6 +383,7 @@ def load_model(checkpoint_info=None, already_loaded_state_dict=None, time_taken_
         state_dict = get_checkpoint_state_dict(checkpoint_info, timer)
 
     checkpoint_config = sd_models_config.find_checkpoint_config(state_dict, checkpoint_info)
+    clip_is_included_into_sd = sd1_clip_weight in state_dict or sd2_clip_weight in state_dict
 
     timer.record("find config")
 
@@ -382,7 +396,7 @@ def load_model(checkpoint_info=None, already_loaded_state_dict=None, time_taken_
 
     sd_model = None
     try:
-        with sd_disable_initialization.DisableInitialization():
+        with sd_disable_initialization.DisableInitialization(disable_clip=clip_is_included_into_sd):
             sd_model = instantiate_from_config(sd_config.model)
     except Exception as e:
         pass
