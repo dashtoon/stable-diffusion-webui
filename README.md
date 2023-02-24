@@ -9,4 +9,4 @@ Fork of the original stable diffusion webui with changes to suit our needs.
 # Instructions
 1. Clone the repo
 2. Run the setup script in bin folder
-3. Run ```sudo docker compose up --build -d```
+3. Run ```cd .. && sudo docker compose up --build -d```
