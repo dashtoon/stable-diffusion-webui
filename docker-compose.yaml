@@ -1,0 +1,34 @@
+version: '3.9'
+
+
+services:
+    webui:
+        shm_size: '1g'
+        ulimits:
+            memlock: -1
+            stack: 67108864
+        restart: always
+        ports:
+            - "7860:7860"
+        build:
+            context: stable-diffusion-webui/
+            dockerfile: Dockerfile
+        volumes:
+            - type: bind
+              source: /opt/dashtoon/stable-diffusion-webui/models
+              target: /workspace/stable-diffusion/models/
+            - type: bind
+              source: /opt/dashtoon/stable-diffusion-webui/extensions
+              target: /workspace/stable-diffusion/extensions/
+            - type: bind
+              source: /opt/dashtoon/stable-diffusion-webui/embeddings
+              target: /workspace/stable-diffusion/embeddings/
+            - type: bind
+              source: /opt/dashtoon/stable-diffusion-webui/outputs
+              target: /workspace/stable-diffusion/outputs/
+        command: /bin/bash -c "./webui.sh"
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - capabilities: [gpu]
