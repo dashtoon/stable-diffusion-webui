@@ -236,6 +236,7 @@ def webui():
 
         setup_cors(app)
         app.add_middleware(GZipMiddleware, minimum_size=1000)
+        Instrumentator().instrument(app).expose(app)
         api = create_api(app)
 
         modules.script_callbacks.app_started_callback(None, app)
