@@ -193,6 +193,7 @@ def setup_middleware(app):
         app.add_middleware(CORSMiddleware, allow_origins=cmd_opts.cors_allow_origins.split(','), allow_methods=['*'], allow_credentials=True, allow_headers=['*'])
     elif cmd_opts.cors_allow_origins_regex:
         app.add_middleware(CORSMiddleware, allow_origin_regex=cmd_opts.cors_allow_origins_regex, allow_methods=['*'], allow_credentials=True, allow_headers=['*'])
+    Instrumentator().instrument(app).expose(app)
     app.build_middleware_stack() # rebuild middleware stack on-the-fly
 
 
@@ -265,7 +266,6 @@ def webui():
         )
         # after initial launch, disable --autolaunch for subsequent restarts
         cmd_opts.autolaunch = False
-        Instrumentator().instrument(app).expose(app)
 
         startup_timer.record("gradio launch")
 
