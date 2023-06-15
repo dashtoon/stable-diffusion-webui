@@ -43,4 +43,7 @@ export COMMANDLINE_ARGS="--no-half-vae --enable-insecure-extension-access --list
 # Uncomment to enable accelerated launch
 export ACCELERATE="True"
 
+# Uncomment to disable TCMalloc
+#export NO_TCMALLOC="True"
+
 ###########################################
